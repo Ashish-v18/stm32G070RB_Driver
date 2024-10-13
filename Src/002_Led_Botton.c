@@ -3,6 +3,7 @@
  *
  *  Created on: Oct 7, 2024
  *      Author: Ashish kumar
+ *      This is for testing input from gpio pins
  */
 
 #include "stm32g0xx.h"
@@ -12,7 +13,7 @@
 
 void delay(void)
 {
-	for(uint32_t i = 0; i <= 5000000; i++ );
+	for(uint32_t i = 0; i <= 500; i++ );
 }
 
 int main(void)
