@@ -12,7 +12,7 @@
 
 void delay(void)
 {
-	for(uint32_t i = 0; i <= 50000; i++ );
+	for(uint32_t i = 0; i <= 5000000; i++ );
 }
 
 int main(void)

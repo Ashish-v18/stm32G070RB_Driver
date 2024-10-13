@@ -94,7 +94,7 @@ void delay(void)
  8000104:	b580      	push	{r7, lr}
  8000106:	b082      	sub	sp, #8
  8000108:	af00      	add	r7, sp, #0
-	for(uint32_t i = 0; i <= 50000; i++ );
+	for(uint32_t i = 0; i <= 5000000; i++ );
  800010a:	2300      	movs	r3, #0
  800010c:	607b      	str	r3, [r7, #4]
  800010e:	e002      	b.n	8000116 <delay+0x12>
@@ -111,7 +111,7 @@ void delay(void)
  8000122:	46bd      	mov	sp, r7
  8000124:	b002      	add	sp, #8
  8000126:	bd80      	pop	{r7, pc}
- 8000128:	0000c350 	.word	0x0000c350
+ 8000128:	004c4b40 	.word	0x004c4b40
 
 0800012c <main>:
 
