@@ -13,6 +13,30 @@
 
 #define __vo volatile
 
+
+/**********************************START:Processor Specific Details **********************************/
+/*
+ * ARM Cortex Mx Processor NVIC ISERx register Addresses
+ */
+
+#define NVIC_ISER          ( (__vo uint32_t*)0xE000E100 )
+
+/*
+ * ARM Cortex Mx Processor NVIC ICERx register Addresses
+ */
+#define NVIC_ICER			((__vo uint32_t*)0xE000E180)
+
+
+/*
+ * ARM Cortex Mx Processor Priority Register Address Calculation
+ */
+#define NVIC_PR_BASE_ADDR 	((__vo uint32_t*)0xE000E400)
+
+/*
+ * ARM Cortex Mx Processor number of priority bits implemented in Priority Register
+ */
+#define NO_PR_BITS_IMPLEMENTED  4
+
 /*
     Base address of SRAM and Flash
 */
@@ -130,24 +154,36 @@ typedef struct
  *   Peripheral register definition structure for EXTI
  */
 
-
 typedef struct
 {
 
-	__vo uint32_t RTSR1;          /*!< EXTI Rising Trigger Selection Register 1,        Address offset:   0x00 */
-	__vo uint32_t FTSR1;          /*!< EXTI Falling Trigger Selection Register 1,       Address offset:   0x04 */
-	__vo uint32_t SWIER1;         /*!< EXTI Software Interrupt event Register 1,        Address offset:   0x08 */
-	__vo uint32_t RPR1;           /*!< EXTI Rising Pending Register 1,                  Address offset:   0x0C */
-	__vo uint32_t FPR1;           /*!< EXTI Falling Pending Register 1,                 Address offset:   0x10 */
-	       uint32_t RESERVED1[3];   /*!< Reserved 1,                                                0x14 -- 0x1C */
-	       uint32_t RESERVED2[5];   /*!< Reserved 2,                                                0x20 -- 0x30 */
-	       uint32_t RESERVED3[11];  /*!< Reserved 3,                                                0x34 -- 0x5C */
-	__vo uint32_t EXTICR[4];      /*!< EXTI External Interrupt Configuration Register,            0x60 -- 0x6C */
-	       uint32_t RESERVED4[4];   /*!< Reserved 4,                                                0x70 -- 0x7C */
-	__vo uint32_t IMR1;           /*!< EXTI Interrupt Mask Register 1,                  Address offset:   0x80 */
-	__vo uint32_t EMR1;           /*!< EXTI Event Mask Register 1,                      Address offset:   0x84 */
+	__vo uint32_t RTSR1;          /*| EXTI Rising Trigger Selection Register 1,        Address offset:   0x00 |*/
+	__vo uint32_t FTSR1;          /*| EXTI Falling Trigger Selection Register 1,       Address offset:   0x04 |*/
+	__vo uint32_t SWIER1;         /*| EXTI Software Interrupt event Register 1,        Address offset:   0x08 |*/
+	__vo uint32_t RPR1;           /*| EXTI Rising Pending Register 1,                  Address offset:   0x0C |*/
+	__vo uint32_t FPR1;           /*| EXTI Falling Pending Register 1,                 Address offset:   0x10 |*/
+	     uint32_t RESERVED1[3];   /*| Reserved 1,                                                0x14 -- 0x1C |*/
+	     uint32_t RESERVED2[5];   /*| Reserved 2,                                                0x20 -- 0x30 |*/
+	     uint32_t RESERVED3[11];  /*| Reserved 3,                                                0x34 -- 0x5C |*/
+	__vo uint32_t EXTICR[4];      /*| EXTI External Interrupt Configuration Register,            0x60 -- 0x6C |*/
+	     uint32_t RESERVED4[4];   /*| Reserved 4,                                                0x70 -- 0x7C |*/
+	__vo uint32_t IMR1;           /*| EXTI Interrupt Mask Register 1,                  Address offset:   0x80 |*/
+	__vo uint32_t EMR1;           /*| EXTI Event Mask Register 1,                      Address offset:   0x84 |*/
 
 }EXTI_RegDef_t;
+
+
+/*
+ *   Peripheral register definition structure for SYSCFG
+ */
+typedef struct
+{
+	__vo uint32_t CFGR1;           /*| SYSCFG configuration register 1,                   Address offset: 0x00 |*/
+	       uint32_t RESERVED0[5];  /*| Reserved,                                                   0x04 --0x14 |*/
+	__vo uint32_t CFGR2;           /*| SYSCFG configuration register 2,                   Address offset: 0x18 |*/
+	       uint32_t RESERVED1[25]; /*| Reserved                                                           0x1C |*/
+	__vo uint32_t IT_LINE_SR[32];  /*| SYSCFG configuration IT_LINE register,             Address offset: 0x80 |*/
+} SYSCFG_RegDef_t;
 
 
 
@@ -164,6 +200,8 @@ typedef struct
 #define RCC    ((RCC_RegDef_t*) RCC_BASEADDR)
 
 #define EXTI   ((EXTI_RegDef_t*) EXTI_BASEADDR)
+
+#define SYSCFG ((SYSCFG_RegDef_t*) SYSCFG_BASEADDR)
 
 /*
 *   Clock Enable Macros for GPIOx peripheral
@@ -227,6 +265,34 @@ typedef struct
 #define GPIOE_REG_RESET()  do { (RCC->IOPRSTR |= (1 << 4)); (RCC->IOPRSTR &= ~(1 << 4)); } while (0)
 #define GPIOE_REG_RESET()  do { (RCC->IOPRSTR |= (1 << 4)); (RCC->IOPRSTR &= ~(1 << 4)); } while (0)
 
+
+/*
+ *  returns port code for given GPIOx base address
+ * This macro returns a code( between 0 to 7) for a given GPIO base address(x)
+ */
+#define GPIO_BASEADDR_TO_CODE(x)      ((x == GPIOA) ? 0 :\
+		                               (x == GPIOB) ? 1 :\
+		                               (x == GPIOA) ? 2 :\
+		                               (x == GPIOC) ? 3 :\
+		                               (x == GPIOD) ? 4 :\
+		                               (x == GPIOE) ? 5 :\
+		                               (x == GPIOF) ? 6 :0)
+
+/*
+ * IRQ(Interrupt Request) Numbers of STM32G07x MCU
+ */
+
+#define IRQ_NO_EXTI0_1       5    // EXTI Line 0 and 1
+#define IRQ_NO_EXTI2_3       6    // EXTI Line 2 and 3
+#define IRQ_NO_EXTI4_15      7    // EXTI Line 4 to 15
+#define IRQ_NO_SPI1          25   // SPI1 global interrupt
+#define IRQ_NO_SPI2          26   // SPI2 global interrupt
+#define IRQ_NO_I2C1          23   // I2C1 event and error
+#define IRQ_NO_USART1        27   // USART1 global interrupt
+#define IRQ_NO_USART2        28   // USART2 global interrupt
+#define IRQ_NO_TIM1_BRK      24   // TIM1 Break, update, trigger
+#define IRQ_NO_TIM2          15   // TIM2 global interrupt
+#define IRQ_NO_TIM3          16   // TIM3 global interrupt
 
 
 /***************************************************

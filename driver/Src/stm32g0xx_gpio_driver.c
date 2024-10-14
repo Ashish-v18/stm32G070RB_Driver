@@ -2,7 +2,7 @@
  * stm32g0xx_gpio_driver.c
  *
  *  Created on: Sep 27, 2024
- *      Author: AshishKumar
+ *      Author: Ashish Kumar
  */
 #include "stm32g0xx_gpio_driver.h"
 
@@ -109,20 +109,36 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle)
     	if(pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_IT_FT)
     	{
     		// 1.Configure the FTSR
+    		EXTI->FTSR1 |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber);
+    		//Clear the corresponding RTSR bit
+    		EXTI ->RTSR1  &= ~(1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber);
+
 
 
     	}
     	else if(pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_IT_RT)
 		{
-    		//1.Configure the RTST
+    		//1.Configure the RTSR
+    		EXTI-> RTSR1 |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber);
+    		//Clear the corresponding FTSR bit
+    		EXTI ->FTSR1  &= ~(1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber);
 		}
     	else if(pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_IT_RFT)
     	{
     		//1. Configure both FTSR and RTSR
+    		EXTI ->RTSR1 |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber);
+    		EXTI ->FTSR1 |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber);
     	}
-    	//2.Configure the GPIO port selection in SYSCFG_EXTICR
+    	//2.Configure the GPIO port selection in SYSCFG
+    	uint8_t temp1 = pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber / 4;
+    	uint8_t temp2 = pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber % 4;
+    	uint8_t portCode = GPIO_BASEADDR_TO_CODE(pGPIOHandle->pGPIOx);
+    	EXTI ->EXTICR[temp1] &= ~(0xF << (temp2 * 4));  // Clear previous bits
+    	EXTI ->EXTICR[temp1] |= (portCode << (temp2 * 4));  // Set GPIO port
 
     	//3.Congigure the exti interrupt delivery using IMR
+    	EXTI ->IMR1 |= 1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber;
+
     }
 
     temp = 0;
@@ -305,31 +321,110 @@ void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber)
 }
 
 /*******************************************************
-* @fn               - PIO_IRQConfig
+* @fn               - GPIO_IRQInterruptConfig
 *
-* @brief            -
-* @param[in]        -
-* @param[in]        -
-* @param[in]
+* @brief            - Configures the interrupt for a specified GPIO IRQ line.
+*
+* @param[in]        - IRQNumber: The number of the interrupt request to configure.
+*                     This corresponds to the specific GPIO interrupt line (0 to 31).
+* @param[in]        - EnorDi: Specifies whether to enable or disable the interrupt.
+*                     Use ENABLE to enable the interrupt or DISABLE to disable it.
 *
 * @return           - None
-* @note             - None
-*/
-void GPIO_IRQConfig(uint8_t IRQNumber, uint8_t IRQPriority, uint8_t EnorDi)
+*
+* @note             - This function directly manipulates the NVIC (Nested Vector Interrupt Controller)
+*                     registers to enable or disable the specified interrupt. Ensure that the
+*                     IRQNumber is within the valid range (0 to 31) before calling this function.
+*******************************************************/
+void GPIO_IRQInterruptConfig(uint8_t IRQNumber, uint8_t EnorDi)
 {
+	if(EnorDi == ENABLE)
+	{
+		if(IRQNumber <= 31)
+		{
+			// Program ISER register
+			*NVIC_ISER |= (1 << IRQNumber);
+		}
+
+	}else
+		if(IRQNumber <= 31)
+		{
+			// Program ICER register
+			*NVIC_ICER |= (1 << IRQNumber);
+		}
 }
 
-/******************************************************* *
-* @fn               - GPIO_IRQHandling
+/*******************************************************
+* @fn               - GPIO_IRQPriorityConfig
 *
-* @brief            -
-* @param[in]        -
-* @param[in]        -
-* @param[in]
+* @brief            - Configures the priority of a specified GPIO interrupt.
+*
+* @param[in]        - IRQNumber: The number of the interrupt request to configure.
+*                     This corresponds to the specific GPIO interrupt line.
+* @param[in]        - IRQPriority: The priority level to assign to the specified IRQ.
+*                     This value should be set according to the application's priority requirements.
 *
 * @return           - None
-* @note             - None
-*/
-void GPIO_IRQHandling(uint8_t PinNumber) {}
+*
+* @note             - The priority value should be set within the limits defined by the
+*                     microcontroller's NVIC. The number of priority bits implemented
+*                     is defined by `NO_PR_BITS_IMPLEMENTED`. Ensure that the priority
+*                     value does not exceed this limit.
+*******************************************************/
+void GPIO_IRQPriorityConfig(uint8_t IRQNumber, uint8_t IRQPriority)
+{
+	//1. First lets find out the ipr register
+	uint8_t iprx = IRQNumber / 4;
+	uint8_t iprx_section  = IRQNumber %4 ;
+
+	uint8_t shift_amount = ( 8 * iprx_section) + ( 8 - NO_PR_BITS_IMPLEMENTED) ;
+
+	*(  NVIC_PR_BASE_ADDR + iprx ) |=  ( IRQPriority << shift_amount );
+
+}
+
+
+
+/***********************************************************************************
+ * @fn          - GPIO_IRQHandling
+ * @brief       - Handles GPIO interrupt requests for a specified pin.
+ *
+ * This function checks the interrupt status for the specified GPIO pin and handles
+ * rising and falling edge interrupts. It clears the interrupt flags after handling
+ * the interrupts to ensure that the system is ready for future interrupts.
+ *
+ * @param[in]   PinNumber - The pin number for which the interrupt is being handled.
+ *                           This should correspond to the GPIO pin number associated
+ *                           with the EXTI (External Interrupt) configuration.
+ *
+ * @return      - None
+ *
+ * @note        - The function should contain the specific interrupt handling code
+ *                where indicated. The interrupt flags in the EXTI registers must
+ *                be checked to determine the type of interrupt that occurred (rising
+ *                or falling).
+ *************************************************************************************/
+void GPIO_IRQHandling(uint8_t PinNumber)
+{
+	// Check if the interrupt flag for the specified pin is set
+	    if (EXTI->RPR1 & (1 << PinNumber))  // Check Rising Pending Register
+	    {
+	        // Handle the rising edge interrupt for the specified pin here
+	        // TODO: Add your specific interrupt handling code here
+
+	        // Clear the interrupt flag for the rising edge
+	        EXTI->RPR1 |= (1 << PinNumber);
+	    }
+
+	    // Check for falling edge interrupt
+	    if (EXTI->FPR1 & (1 << PinNumber))  // Check Falling Pending Register
+	    {
+	        // Handle the falling edge interrupt for the specified pin here
+	        // TODO: Add your specific interrupt handling code here
+
+	        // Clear the interrupt flag for the falling edge
+	        EXTI->FPR1 |= (1 << PinNumber);
+	    }
+}
 
 
